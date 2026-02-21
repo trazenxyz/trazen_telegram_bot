@@ -38,19 +38,33 @@ def save_data():
 # ---------------------------
 # /register command
 # ---------------------------
-def register(update: Update, context: CallbackContext):
-    chat = update.effective_chat
-    chat_id = chat.id
-    thread_id = getattr(update.message, "message_thread_id", None)
+def register(update, context):
+    chat_id = update.effective_chat.id
+    thread_id = update.message.message_thread_id if hasattr(update.message, "message_thread_id") else None
 
-    key = f"{chat_id}:{thread_id}" if thread_id else str(chat_id)
+    # Load existing data
+    try:
+        with open("sent_updates.json", "r") as f:
+            data = json.load(f)
+    except:
+        data = {}
 
-    if key not in data["registered_chats"]:
-        data["registered_chats"][key] = {"chat_id": chat_id, "thread_id": thread_id}
-        save_data()
-        update.message.reply_text(
-            "✅ This chat/topic has been registered for Trazen updates!"
-        )
+    if "registered_chats" not in data:
+        data["registered_chats"] = {}
+    if "sent_ids" not in data:
+        data["sent_ids"] = []
+
+    # Save the chat info
+    data["registered_chats"][str(chat_id)] = {"thread_id": thread_id}
+
+    with open("sent_updates.json", "w") as f:
+        json.dump(data, f, indent=4)
+
+    # Send confirmation message
+    context.bot.send_message(
+        chat_id=chat_id,
+        text="✅ This chat has been registered! Future Trazen updates will be posted here."
+    )
 
         # Immediately send the latest opportunities (up to MAX_PER_CHAT)
         opportunities = fetch_opportunities()
