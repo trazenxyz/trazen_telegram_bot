@@ -13,6 +13,9 @@ TRAZEN_API = os.environ["TRAZEN_API"]
 # File to store registered chats/topics and sent updates
 SENT_FILE = "sent_updates.json"
 
+# Max messages per chat per run (prevents spam)
+MAX_PER_CHAT = 2
+
 # ---------------------------
 # Initialize bot
 # ---------------------------
@@ -49,12 +52,15 @@ def register(update: Update, context: CallbackContext):
             "✅ This chat/topic has been registered for Trazen updates!"
         )
 
-        # Immediately send the latest opportunity
+        # Immediately send the latest opportunities (up to MAX_PER_CHAT)
         opportunities = fetch_opportunities()
+        messages_sent = 0
         for opp in opportunities:
             opp_id = opp.get("id")
             if opp_id in data["sent_ids"]:
                 continue
+            if messages_sent >= MAX_PER_CHAT:
+                break
             text = f"🚀 New opportunity available!\n\n{opp.get('title')}\n{opp.get('link')}"
             try:
                 bot.send_message(
@@ -62,6 +68,7 @@ def register(update: Update, context: CallbackContext):
                     text=text,
                     message_thread_id=thread_id
                 )
+                messages_sent += 1
             except Exception as e:
                 print("Failed to send to chat:", e)
             data["sent_ids"].append(opp_id)
@@ -82,29 +89,37 @@ def fetch_opportunities():
         return []
 
 # ---------------------------
-# Send updates to all registered chats
+# Send updates to all registered chats (with per-chat limits)
 # ---------------------------
 def send_updates():
     opportunities = fetch_opportunities()
-    for opp in opportunities:
-        opp_id = opp.get("id")
-        if opp_id in data["sent_ids"]:
-            continue  # Skip already sent
-        text = f"🚀 New opportunity available!\n\n{opp.get('title')}\n{opp.get('link')}"
-        for chat_info in data["registered_chats"].values():
+    for chat_key, chat_info in data["registered_chats"].items():
+        messages_sent = 0
+        for opp in opportunities:
+            opp_id = opp.get("id")
+            if opp_id in data["sent_ids"]:
+                continue
+            if messages_sent >= MAX_PER_CHAT:
+                break
+
+            text = f"🚀 New opportunity available!\n\n{opp.get('title')}\n{opp.get('link')}"
             try:
                 bot.send_message(
                     chat_id=chat_info["chat_id"],
                     text=text,
                     message_thread_id=chat_info.get("thread_id")
                 )
+                messages_sent += 1
             except Exception as e:
-                print("Failed to send to chat:", e)
-        data["sent_ids"].append(opp_id)
+                print(f"Failed to send to chat {chat_info['chat_id']}:", e)
+
+            # Mark this opportunity as sent globally
+            data["sent_ids"].append(opp_id)
+
     save_data()
 
 # ---------------------------
-# Main function for manual run / polling (optional)
+# Main function for optional local polling (not needed for GitHub Actions)
 # ---------------------------
 def main():
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
