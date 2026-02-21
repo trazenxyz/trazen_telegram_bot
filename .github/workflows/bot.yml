@@ -31,7 +31,7 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TRAZEN_API: ${{ secrets.TRAZEN_API }}
-        run: python trazen_bot.py
+        run: python trazen_telegram_bot.py
 
       # Step 5 — Commit updated sent_updates.json
       - name: Commit sent_updates.json
