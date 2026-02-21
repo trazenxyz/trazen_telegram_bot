@@ -28,6 +28,7 @@ if os.path.exists(SENT_FILE):
 else:
     data = {"registered_chats": {}, "sent_ids": []}
 
+
 # ---------------------------
 # Helper to save JSON data
 # ---------------------------
@@ -35,36 +36,42 @@ def save_data():
     with open(SENT_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+
+# ---------------------------
+# Fetch new opportunities from Trazen API
+# ---------------------------
+def fetch_opportunities():
+    try:
+        response = requests.get(TRAZEN_API)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print("Error fetching Trazen API:", e)
+        return []
+
+
 # ---------------------------
 # /register command
 # ---------------------------
-def register(update, context):
+def register(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
-    thread_id = update.message.message_thread_id if hasattr(update.message, "message_thread_id") else None
-
-    # Load existing data
-    try:
-        with open("sent_updates.json", "r") as f:
-            data = json.load(f)
-    except:
-        data = {}
+    thread_id = getattr(update.message, "message_thread_id", None)
 
     if "registered_chats" not in data:
         data["registered_chats"] = {}
     if "sent_ids" not in data:
         data["sent_ids"] = []
 
-    # Save the chat info
-    data["registered_chats"][str(chat_id)] = {"thread_id": thread_id}
+    if str(chat_id) not in data["registered_chats"]:
+        # Save the chat info
+        data["registered_chats"][str(chat_id)] = {"thread_id": thread_id}
+        save_data()
 
-    with open("sent_updates.json", "w") as f:
-        json.dump(data, f, indent=4)
-
-    # Send confirmation message
-    context.bot.send_message(
-        chat_id=chat_id,
-        text="✅ This chat has been registered! Future Trazen updates will be posted here."
-    )
+        # Send confirmation message
+        context.bot.send_message(
+            chat_id=chat_id,
+            text="✅ This chat has been registered! Future Trazen updates will be posted here."
+        )
 
         # Immediately send the latest opportunities (up to MAX_PER_CHAT)
         opportunities = fetch_opportunities()
@@ -88,19 +95,12 @@ def register(update, context):
             data["sent_ids"].append(opp_id)
         save_data()
     else:
-        update.message.reply_text("ℹ️ This chat/topic is already registered.")
+        # Chat already registered
+        context.bot.send_message(
+            chat_id=chat_id,
+            text="ℹ️ This chat/topic is already registered."
+        )
 
-# ---------------------------
-# Fetch new opportunities from Trazen API
-# ---------------------------
-def fetch_opportunities():
-    try:
-        response = requests.get(TRAZEN_API)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        print("Error fetching Trazen API:", e)
-        return []
 
 # ---------------------------
 # Send updates to all registered chats (with per-chat limits)
@@ -119,21 +119,22 @@ def send_updates():
             text = f"🚀 New opportunity available!\n\n{opp.get('title')}\n{opp.get('link')}"
             try:
                 bot.send_message(
-                    chat_id=chat_info["chat_id"],
+                    chat_id=int(chat_key),
                     text=text,
                     message_thread_id=chat_info.get("thread_id")
                 )
                 messages_sent += 1
             except Exception as e:
-                print(f"Failed to send to chat {chat_info['chat_id']}:", e)
+                print(f"Failed to send to chat {chat_key}:", e)
 
             # Mark this opportunity as sent globally
             data["sent_ids"].append(opp_id)
 
     save_data()
 
+
 # ---------------------------
-# Main function for optional local polling (not needed for GitHub Actions)
+# Optional local polling for testing
 # ---------------------------
 def main():
     updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
@@ -142,8 +143,9 @@ def main():
     updater.start_polling()
     updater.idle()
 
+
 # ---------------------------
-# Entry point when running via GitHub Actions
+# Entry point for GitHub Actions (scheduled runs)
 # ---------------------------
 if __name__ == "__main__":
     send_updates()
