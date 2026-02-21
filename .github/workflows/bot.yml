@@ -1,0 +1,43 @@
+name: Trazen Telegram Bot
+
+on:
+  # Runs every hour
+  schedule:
+    - cron: "0 * * * *"
+  # Allows manual run from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1 — Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2 — Set up Python
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Step 3 — Install dependencies
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Step 4 — Run the bot script
+      - name: Run Trazen bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TRAZEN_API: ${{ secrets.TRAZEN_API }}
+        run: python trazen_bot.py
+
+      # Step 5 — Commit updated sent_updates.json
+      - name: Commit sent_updates.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sent_updates.json
+          git commit -m "Update sent opportunities" || echo "No changes"
+          git push
