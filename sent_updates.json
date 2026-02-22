@@ -1,4 +1,11 @@
 {
-    "registered_chats": {},
+    "registered_chats": {
+        "-1003781355198": {
+            "thread_id": null
+        },
+        "-1003591634651": {
+            "thread_id": 2
+        }
+    },
     "sent_ids": []
 }
