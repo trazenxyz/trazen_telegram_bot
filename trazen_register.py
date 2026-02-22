@@ -66,5 +66,5 @@ def main():
     print("Bot started. Waiting for /register commands...")
     app.run_polling()
 
-if name == "main":
+if __name__ == "__main__":
     main()
